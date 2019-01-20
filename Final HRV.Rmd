@@ -1,0 +1,187 @@
+---
+title: "Final HRV"
+author: "Brian Wright"
+date: "October 11, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+getwd()
+setwd("C:/Users/bwright/Documents/R/VR/SessionData/vr")
+
+```
+
+
+```{r}
+test <- read.csv()
+
+library(dplyr)
+library(stargazer)
+library(spectral)
+
+```
+
+Need to build a script that calculates the seconds backwards to captures the bottom 120 seconds and generate the % of spectrum density inside the band between .04 and .15 as a % of the remaining spectrum, this becomes the relative power density inside that band. Also need to systematic sample every .05 seconds. 
+
+We will then compared distributions of mobile versions non-mobile. Below are the individual operations now need to included in the function. 
+
+```{r,eval=FALSE}
+#File names for future argument 
+vr_fileNames <- list.files(path="C:/Users/bwright/Documents/R/VR/SessionData/vr", pattern = "csv")
+
+setwd("C:/Users/bwright/Documents/R/VR/SessionData/vr")
+
+#1.Load Data
+test_vr <- read.csv("gw1501_20170824123722.csv")
+#View(test_vr)
+
+
+#2.Calculates the difference between the rows
+test_vr$diff <-  c(0,diff(test_vr$time))
+
+#View(test_vr)
+
+#3.Calculates the cumulitive sum in reverse. 
+test_vr$cum_diff <- rev(cumsum(rev(test_vr$diff))) #double reverse. 
+
+#View(test_vr)
+
+#4.Next Step is identifying 120 in the cum_diff along the way and deleting everything else. 
+
+subset_120 <- subset(test_vr, cum_diff <= 120)
+#So I think all we need to do here in order to systematically sample is create a subset on the cum_diff column indicating a range to sample starting with between .05 and .01
+
+#View(subset_120)
+
+#New 5a. Sample entries between .05 and .1., runs the same
+subset_120 <- subset(subset_120, subset_120$diff >= 0.050  & subset_120$diff <=.0599)
+
+#str(subset_120)
+
+dim(subset_120)
+#5b.Then run the spectrum analysis on hr as seen below, just need to automate all this into a argument. 
+
+#6.Generate the spectrum ----changed this in the testing process------ok changed back 11.26
+spec_120_freq <- spectrum(subset_120$hr, method = "pgram")
+
+#str(spec_120_freq)
+
+#7.Generate dataframe composed of freq and spec output
+spec_120_freq_df <- data.frame(spec_120_freq$freq,spec_120_freq$spec)
+View(spec_120_freq_df)
+
+#8.Subset based on LF freq
+new_df = data.frame(subset(spec_120_freq_df, spec_120_freq_df$spec_120_freq.freq >= 0.04 & spec_120_freq_df$spec_120_freq.freq <= 0.15))
+
+#9 Calculate Relative Power
+LF_Power <- sum(new_df$spec_120_freq.spec)/sum(spec_120_freq_df$spec_120_freq.spec)
+
+#10 Write the results to a list or data.frame
+LF_Power
+
+```
+
+```{r, eval=FALSE}
+#Creates the function to determine the power spectrum density 
+
+lh_spec_cal <- function(i){
+  i$diff <-  c(0,diff(i$time))
+  i$cum_diff <- rev(cumsum(rev(i$diff)))
+  sub_set <- subset(i, cum_diff <= 120)
+  sub_set <- subset(sub_set, sub_set$diff >=.05 & sub_set$diff <=.075) 
+  spec <- spectrum(sub_set$hr,method = "pgram")
+  xxx <- data.frame(spec$freq,spec$spec)
+  xxxx <- data.frame(subset(xxx, xxx$spec.freq >= .04 & xxx$spec.freq <= 0.15))
+  relative <- subset(xxx,xxx$spec.freq < .04)
+  LF_Power <- sum(xxxx$spec.spec)/(sum(xxx$spec.spec)-sum(relative$spec.spec))
+  LF_Power
+}
+
+lh_spec_cal(test_vr)
+
+#Create a list of file names
+setwd("C:/Users/bwright/Documents/R/VR/SessionData/vr")
+
+vr_fileNames <- list.files(path="C:/Users/bwright/Documents/R/VR/SessionData/vr", pattern = "csv")
+
+#Run a loop to pass all the file names for vr
+for (i in 1:length(vr_fileNames)) {
+    vr <- read.csv(vr_fileNames[i], stringsAsFactors = FALSE)
+    vr_output[i] <- lh_spec_cal(vr)
+    vr_lh <- data.frame(vr_fileNames,vr_output)
+}
+
+#View(vr_lh)
+median(vr_lh$vr_output)
+
+
+#Ok now just need to do the same for the mobile device 
+
+setwd("C:/Users/bwright/Documents/R/VR/SessionData/mobile")
+
+mobile_filenames <- list.files(path="C:/Users/bwright/Documents/R/VR/SessionData/mobile", pattern = "csv")
+
+mbl_output_1 <- (1:100)
+
+#Run a for loop to pass all the file names for mobile
+for (i in 1:length(mobile_filenames)) {
+    mbl_1 <- read.csv(mobile_filenames[i], stringsAsFactors = FALSE)
+    mbl_output_1[i] <- lh_spec_cal(mbl_1)
+}
+
+mbl_lh <- data.frame(mobile_filenames,mbl_output_1)
+
+median(mbl_output_1)
+
+
+
+```
+
+
+testing...
+```{r, eval=FALSE}
+test_vr$diff <- c(0,diff(test_vr$time))
+head(test_vr$diff)
+test_vr$cum_diff <- rev(cumsum(test_vr$diff))
+head(test_vr)
+sub_set <- subset(test_vr, cum_diff <=120)
+head(sub_set)
+
+spec <- spectrum(sub_set$hr, method = "ar")
+xxx <- data.frame(spec$freq, spec$spec)
+View(xxx)
+View(xxxx)
+xxxx <- data.frame(subset(xxx, xxx$spec.freq >= .04 & xxx$spec.freq <= 0.15))
+
+head(xxxx)
+head(xxx)
+
+relative <- subset(xxx,xxx$spec.freq < .04)
+View(relative)
+
+
+LF_Power <- sum(xxxx$spec.spec)/(sum(xxx$spec.spec)-sum(relative$spec.spec))
+LF_Power
+
+head(sub_set)
+```
+Basic descripitive stats
+```{r}
+library(dplyr)
+library(doBy)
+setwd("C:/Users/bwright/Documents/R/VR/")
+
+pb_data <- read.csv("VR_Data2.csv") #dataframe containing all the output from the 220 sessions
+str(pb_data)
+
+xx <- summaryBy(time~UserType, pb_data) #Generating the time averages for the two groups. 
+
+xx
+
+
+
+```
+
